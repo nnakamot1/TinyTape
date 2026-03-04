@@ -46,4 +46,13 @@ module tb ();
       .rst_n  (rst_n)     // not reset
   );
 
+  // Deterministic startup values before cocotb begins driving.
+  initial begin
+    clk = 1'b0;
+    rst_n = 1'b1;
+    ena = 1'b0;
+    ui_in = 8'h00;
+    uio_in = 8'h00;
+  end
+
 endmodule

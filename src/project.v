@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Your Name
+ * Copyright (c) 2024 Nathan Nakamoto
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,22 +10,48 @@ module tt_um_example (
     output wire [7:0] uo_out,   // Dedicated outputs
     input  wire [7:0] uio_in,   // IOs: Input path
     output wire [7:0] uio_out,  // IOs: Output path
-    output wire [7:0] uio_oe,   // IOs: Enable path (active high: 0=input, 1=output)
-    input  wire       ena,      // always 1 when the design is powered, so you can ignore it
+    output wire [7:0] uio_oe,   // IOs: Enable path
+    input  wire       ena,      // always 1 when powered
     input  wire       clk,      // clock
-    input  wire       rst_n     // reset_n - low to reset
+    input  wire       rst_n     // active-low reset
 );
 
-  // All output pins must be assigned. If not used, assign to 0.
-  assign uo_out  = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
-  assign uio_out = 0;
-  assign uio_oe  = 0;
+  assign uio_out = 8'b0;
+  assign uio_oe  = 8'b0;
+
+  reg [7:0] lfsr;
+  reg [7:0] shown_value;
+
+  localparam [7:0] DISPLAY_TICKS = 8'd20;
+  reg [7:0] tick_count;
+
+  wire feedback = lfsr[7] ^ lfsr[5] ^ lfsr[4] ^ lfsr[3];
+
+  always @(posedge clk) begin
+    if (!rst_n) begin
+
+      lfsr        <= 8'hA5;  // non-zero seed
+      shown_value <= 8'hA5;
+      tick_count  <= 8'd0;
+    
+    end else begin
+      lfsr <= {lfsr[6:0], feedback};
+
+      if (tick_count == DISPLAY_TICKS - 1'b1) begin
+        tick_count  <= 8'd0;
+        shown_value <= lfsr;
+    
+      end else begin
+        tick_count <= tick_count + 1'b1;
+    
+      end
+    end
+  end
+
+  assign uo_out = shown_value;
 
 
-  //TESTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
 
-
-  // List all unused inputs to prevent warnings
-  wire _unused = &{ena, clk, rst_n, 1'b0};
+  wire _unused = &{ena, uio_in, ui_in, 1'b0};
 
 endmodule

@@ -5,6 +5,7 @@
 SIM ?= icarus
 FST ?= -fst # Use more efficient FST format
 TOPLEVEL_LANG ?= verilog
+PYTHON ?= python3
 SRC_DIR = $(PWD)/../src
 PROJECT_SOURCES = project.v
 
@@ -38,8 +39,24 @@ COMPILE_ARGS 		+= -I$(SRC_DIR)
 VERILOG_SOURCES += $(PWD)/tb.v
 TOPLEVEL = tb
 
-# List test modules to run, separated by commas and without the .py suffix:
+# Cocotb 2.x test module list.
 COCOTB_TEST_MODULES = test
 
+# Cocotb 1.x ships `cocotb-config`; cocotb 2.x uses `python -m cocotb_tools.config`.
+COCOTB_CONFIG_MAKEFILES := $(shell cocotb-config --makefiles 2>/dev/null)
+COCOTB_MAKEFILES_DIR := $(COCOTB_CONFIG_MAKEFILES)
+ifeq ($(strip $(COCOTB_MAKEFILES_DIR)),)
+COCOTB_MAKEFILES_DIR := $(shell $(PYTHON) -m cocotb_tools.config --makefiles 2>/dev/null)
+endif
+
+# Older cocotb makefiles consume MODULE instead of COCOTB_TEST_MODULES.
+ifneq ($(strip $(COCOTB_CONFIG_MAKEFILES)),)
+MODULE ?= $(COCOTB_TEST_MODULES)
+endif
+
+ifeq ($(strip $(COCOTB_MAKEFILES_DIR)),)
+$(error Could not find cocotb makefiles. Install dependencies with `$(PYTHON) -m pip install -r requirements.txt`)
+endif
+
 # include cocotb's make rules to take care of the simulator setup
-include $(shell cocotb-config --makefiles)/Makefile.sim
+include $(COCOTB_MAKEFILES_DIR)/Makefile.sim

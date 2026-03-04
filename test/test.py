@@ -8,33 +8,40 @@ from cocotb.triggers import ClockCycles
 
 @cocotb.test()
 async def test_project(dut):
-    dut._log.info("Start")
-
-    # Set the clock period to 10 us (100 KHz)
-    clock = Clock(dut.clk, 10, unit="us")
+    dut._log.info("Start timed LFSR test")
+    clock = Clock(dut.clk, 10, unit="ns")
     cocotb.start_soon(clock.start())
 
-    # Reset
-    dut._log.info("Reset")
     dut.ena.value = 1
     dut.ui_in.value = 0
     dut.uio_in.value = 0
+
     dut.rst_n.value = 0
-    await ClockCycles(dut.clk, 10)
+    await ClockCycles(dut.clk, 5)
     dut.rst_n.value = 1
-
-    dut._log.info("Test project behavior")
-
-    # Set the input values you want to test
-    dut.ui_in.value = 20
-    dut.uio_in.value = 30
-
-    # Wait for one clock cycle to see the output values
     await ClockCycles(dut.clk, 1)
 
-    # The following assersion is just an example of how to check the output values.
-    # Change it to match the actual expected output of your module:
-    assert dut.uo_out.value == 50
+    display_ticks = 20
+    start_value = int(dut.uo_out.value) & 0xFF
+    dut._log.info(f"Initial shown value: 0x{start_value:02X}")
 
-    # Keep testing the module by changing the input values, waiting for
-    # one or more clock cycles, and asserting the expected output values.
+    # Output should stay stable between timer events.
+    await ClockCycles(dut.clk, display_ticks - 1)
+    assert (int(dut.uo_out.value) & 0xFF) == start_value, "Output changed too early"
+
+    # At timer event, shown value should update.
+    await ClockCycles(dut.clk, 1)
+    first_update = int(dut.uo_out.value) & 0xFF
+    assert first_update != start_value, "Output did not update on timer boundary"
+
+    seen = [first_update]
+    for _ in range(7):
+        stable = seen[-1]
+        await ClockCycles(dut.clk, display_ticks - 1)
+        assert (int(dut.uo_out.value) & 0xFF) == stable, "Output changed between timer ticks"
+        await ClockCycles(dut.clk, 1)
+        seen.append(int(dut.uo_out.value) & 0xFF)
+
+    assert all(v != 0 for v in seen), "LFSR sequence should never hit zero"
+    assert len(set(seen)) >= 4, f"Sequence not varying enough: {seen}"
+    dut._log.info(f"Timed LFSR values: {[hex(v) for v in seen]}")
